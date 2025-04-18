@@ -57,7 +57,7 @@ def produce_patient_data():
         if patient_data:
             try:
                 future = producer.send(RAW_DATA_TOPIC, patient_data)
-                future.get(timeout=10)  # Ensure the message is sent
+                future.get(timeout=10)  
                 print(f"✅ Sent to Kafka: {patient_data}")
             except KafkaError as e:
                 print(f"❌ Kafka Error: {e}")
