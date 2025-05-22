@@ -4,9 +4,6 @@ kafka-python==2.0.2
 # MongoDB client
 pymongo==4.5.0
 
-# Apache Cassandra driver
-cassandra-driver==3.28.0
-
 # JSON parsing
 orjson==3.9.7
 
@@ -15,3 +12,10 @@ loguru==0.7.2
 
 # Data validation (optional, for strict data schemas)
 pydantic==2.5.3
+
+uvicorn
+influxdb-client 
+pandas 
+scikit-learn 
+joblib
+fastapi

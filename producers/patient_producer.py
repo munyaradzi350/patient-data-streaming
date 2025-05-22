@@ -1,7 +1,7 @@
 import json
-import time
 from kafka import KafkaProducer
 from pymongo import MongoClient
+from pymongo.errors import PyMongoError
 from kafka.errors import KafkaError
 
 # ✅ Kafka Configuration
@@ -34,41 +34,26 @@ except Exception as e:
     print(f"❌ MongoDB connection failed: {e}")
     exit(1)
 
-def fetch_latest_patient():
-    """Fetch the latest patient record from MongoDB."""
+def stream_new_patients():
+    """Stream only newly inserted patients using MongoDB change streams."""
+    pipeline = [{'$match': {'operationType': 'insert'}}]
+
     try:
-        patient = patient_collection.find_one({}, sort=[("_id", -1)])
-        if patient:
-            patient["_id"] = str(patient["_id"])  # Convert ObjectId to string
-            return patient
-        else:
-            return None
-    except Exception as e:
-        print(f"❌ Error fetching patient data: {e}")
-        return None
-
-def produce_patient_data():
-    """Continuously stream patient data from MongoDB to Kafka."""
-    print(f"🚀 Streaming patient data to Kafka topic: {RAW_DATA_TOPIC}")
-
-    while True:
-        patient_data = fetch_latest_patient()
-
-        if patient_data:
-            try:
-                future = producer.send(RAW_DATA_TOPIC, patient_data)
-                future.get(timeout=10)  
-                print(f"✅ Sent to Kafka: {patient_data}")
-            except KafkaError as e:
-                print(f"❌ Kafka Error: {e}")
-                time.sleep(10)  # Retry delay
-        else:
-            print("⚠️ No patient data found. Waiting for new data...")
-
-        time.sleep(5)  # Stream every 5 seconds
+        print(f"🚀 Watching for new patients in MongoDB to stream to Kafka topic: {RAW_DATA_TOPIC}")
+        with patient_collection.watch(pipeline) as change_stream:
+            for change in change_stream:
+                new_patient = change['fullDocument']
+                new_patient['_id'] = str(new_patient['_id'])  # Convert ObjectId to string
+                try:
+                    producer.send(RAW_DATA_TOPIC, new_patient)
+                    print(f"✅ Sent to Kafka: {new_patient}")
+                except KafkaError as ke:
+                    print(f"❌ Kafka error: {ke}")
+    except PyMongoError as pe:
+        print(f"❌ MongoDB Change Stream error: {pe}")
 
 if __name__ == "__main__":
     try:
-        produce_patient_data()
+        stream_new_patients()
     finally:
         producer.close()
