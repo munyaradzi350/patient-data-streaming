@@ -1,19 +1,22 @@
+# producers/patient_producer.py
+
 import json
 from kafka import KafkaProducer
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 from kafka.errors import KafkaError
+from datetime import datetime
 
-# ✅ Kafka Configuration
+# Kafka Configuration
 KAFKA_BROKER = "localhost:9092"
 RAW_DATA_TOPIC = "patient-raw-data"
 
-# ✅ MongoDB Configuration
+# MongoDB Configuration
 MONGO_URI = "mongodb://localhost:27017"
 MONGO_DB = "hospital_db"
 MONGO_COLLECTION = "patients"
 
-# ✅ Initialize Kafka Producer
+# Initialize Kafka Producer
 try:
     producer = KafkaProducer(
         bootstrap_servers=KAFKA_BROKER,
@@ -24,7 +27,7 @@ except Exception as e:
     print(f"❌ Kafka connection failed: {e}")
     exit(1)
 
-# ✅ Connect to MongoDB
+# Connect to MongoDB
 try:
     mongo_client = MongoClient(MONGO_URI)
     db = mongo_client[MONGO_DB]
@@ -44,9 +47,14 @@ def stream_new_patients():
             for change in change_stream:
                 new_patient = change['fullDocument']
                 new_patient['_id'] = str(new_patient['_id'])  # Convert ObjectId to string
+
+                # Capture send time
+                send_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                new_patient['Sent_At'] = send_time
+
                 try:
                     producer.send(RAW_DATA_TOPIC, new_patient)
-                    print(f"✅ Sent to Kafka: {new_patient}")
+                    print(f"✅ Sent to Kafka | Patient: {new_patient['Patient_ID']} | Time: {send_time}")
                 except KafkaError as ke:
                     print(f"❌ Kafka error: {ke}")
     except PyMongoError as pe:
